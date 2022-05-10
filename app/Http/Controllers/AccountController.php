@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CreateLoyaltyAccountRequest;
 use App\Models\LoyaltyAccount;
-use Illuminate\Http\Request;
 
 class AccountController extends Controller
 {
-    public function create(Request $request)
+    public function create(CreateLoyaltyAccountRequest $request)
     {
-        return LoyaltyAccount::create($request->all());
+        return LoyaltyAccount::create($request->validated());
     }
 
     public function activate($type, $id)

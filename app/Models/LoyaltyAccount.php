@@ -12,13 +12,12 @@ class LoyaltyAccount extends Model
 {
     protected $table = 'loyalty_account';
 
-    protected $fillable = [
-        'phone',
-        'card',
-        'email',
-        'email_notification',
-        'phone_notification',
-        'active',
+    protected $guarded = ['id'];
+
+    protected $attributes = [
+        'email_notification' => true,
+        'phone_notification' => true,
+        'active' => true,
     ];
 
     public function getBalance(): float
