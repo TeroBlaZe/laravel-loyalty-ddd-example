@@ -30,11 +30,10 @@ final class WithdrawHandler
             $transaction = $account->withdraw($currentBalance, $command->pointsAmount, $command->description);
 
             $this->transactionWriter->add($transaction);
+            $this->transactionManager->commit();
         } catch (\Exception $e) {
             $this->transactionManager->rollback();
             throw $e;
         }
-
-        $this->transactionManager->commit();
     }
 }
