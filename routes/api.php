@@ -32,8 +32,3 @@ Route::group(['middleware' => ['auth:sanctum']], function () {
     Route::post('loyaltyPoints/withdraw', [LoyaltyPointsController::class, 'withdraw']);
     Route::post('loyaltyPoints/cancel', [LoyaltyPointsController::class, 'cancel']);
 });
-
-
-
-
-
