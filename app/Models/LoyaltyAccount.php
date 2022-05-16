@@ -2,12 +2,8 @@
 
 namespace App\Models;
 
-use App\Mail\AccountActivated;
-use App\Mail\AccountDeactivated;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 /**
  * App\Models\LoyaltyAccount
@@ -43,15 +39,12 @@ use Illuminate\Support\Facades\Mail;
 class LoyaltyAccount extends Model
 {
     protected $table = 'loyalty_account';
-
     protected $guarded = ['id'];
-
     protected $attributes = [
         'email_notification' => true,
         'phone_notification' => true,
         'active' => true,
     ];
-
     protected $casts = [
         'active' => 'bool',
         'email_notification' => 'bool',
@@ -71,21 +64,5 @@ class LoyaltyAccount extends Model
     public function scopeByEmail(Builder $builder, string $email): Builder
     {
         return $builder->where('email', $email);
-    }
-
-    public function notify()
-    {
-        if ($this->email != '' && $this->email_notification) {
-            if ($this->active) {
-                Mail::to($this)->send(new AccountActivated($this->getBalance()));
-            } else {
-                Mail::to($this)->send(new AccountDeactivated());
-            }
-        }
-
-        if ($this->phone != '' && $this->phone_notification) {
-            // instead SMS component
-            Log::info('Account: phone: ' . $this->phone . ' ' . ($this->active ? 'Activated' : 'Deactivated'));
-        }
     }
 }
