@@ -2,102 +2,65 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\LoyaltyPointsReceived;
-use App\Models\LoyaltyAccount;
-use App\Models\LoyaltyPointsTransaction;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
+use App\Http\Middleware\RequestLogger;
+use App\Http\Requests\CancelLoyaltyPointsRequest;
+use App\Http\Requests\DepositLoyaltyPointsRequest;
+use App\Http\Requests\WithdrawLoyaltyPointsRequest;
+use Carbon\Carbon;
+use Domain\Account\AccountType;
+use Domain\Transaction\Payment;
+use Domain\Transaction\PointsAmount;
+use Domain\Transaction\TransactionId;
+use UseCase\Transaction\Command\CancelCommand;
+use UseCase\Transaction\Command\CancelHandler;
+use UseCase\Transaction\Command\DepositCommand;
+use UseCase\Transaction\Command\DepositHandler;
+use UseCase\Transaction\Command\WithdrawCommand;
+use UseCase\Transaction\Command\WithdrawHandler;
 
 class LoyaltyPointsController extends Controller
 {
-    public function deposit()
+    public function __construct()
     {
-        $data = $_POST;
-
-        Log::info('Deposit transaction input: ' . print_r($data, true));
-
-        $type = $data['account_type'];
-        $id = $data['account_id'];
-        if (($type == 'phone' || $type == 'card' || $type == 'email') && $id != '') {
-            if ($account = LoyaltyAccount::where($type, '=', $id)->first()) {
-                if ($account->active) {
-                    $transaction =  LoyaltyPointsTransaction::performPaymentLoyaltyPoints($account->id, $data['loyalty_points_rule'], $data['description'], $data['payment_id'], $data['payment_amount'], $data['payment_time']);
-                    Log::info($transaction);
-                    if ($account->email != '' && $account->email_notification) {
-                        Mail::to($account)->send(new LoyaltyPointsReceived($transaction->points_amount, $account->getBalance()));
-                    }
-                    if ($account->phone != '' && $account->phone_notification) {
-                        // instead SMS component
-                        Log::info('You received' . $transaction->points_amount . 'Your balance' . $account->getBalance());
-                    }
-                    return $transaction;
-                } else {
-                    Log::info('Account is not active');
-                    return response()->json(['message' => 'Account is not active'], 400);
-                }
-            } else {
-                Log::info('Account is not found');
-                return response()->json(['message' => 'Account is not found'], 400);
-            }
-        } else {
-            Log::info('Wrong account parameters');
-            throw new \InvalidArgumentException('Wrong account parameters');
-        }
+        $this->middleware(RequestLogger::class);
     }
 
-    public function cancel()
+    public function deposit(DepositLoyaltyPointsRequest $request, DepositHandler $handler): void
     {
-        $data = $_POST;
-
-        $reason = $data['cancellation_reason'];
-
-        if ($reason == '') {
-            return response()->json(['message' => 'Cancellation reason is not specified'], 400);
-        }
-
-        if ($transaction = LoyaltyPointsTransaction::where('id', '=', $data['transaction_id'])->where('canceled', '=', 0)->first()) {
-            $transaction->canceled = time();
-            $transaction->cancellation_reason = $reason;
-            $transaction->save();
-        } else {
-            return response()->json(['message' => 'Transaction is not found'], 400);
-        }
+        $handler->handle(
+            new DepositCommand(
+                AccountType::from($request->input('account_type')),
+                (string) $request->input('account_id'),
+                new Payment(
+                    (string) $request->input('payment_id'),
+                    (float) $request->input('payment_amount'),
+                    Carbon::createFromTimestamp($request->input('payment_time')),
+                ),
+                $request->input('loyalty_points_rule'),
+                $request->input('description'),
+            )
+        );
     }
 
-    public function withdraw()
+    public function cancel(CancelLoyaltyPointsRequest $request, CancelHandler $handler): void
     {
-        $data = $_POST;
+        $handler->handle(
+            new CancelCommand(
+                new TransactionId((int) $request->input('transaction_id')),
+                $request->input('cancellation_reason'),
+            )
+        );
+    }
 
-        Log::info('Withdraw loyalty points transaction input: ' . print_r($data, true));
-
-        $type = $data['account_type'];
-        $id = $data['account_id'];
-        if (($type == 'phone' || $type == 'card' || $type == 'email') && $id != '') {
-            if ($account = LoyaltyAccount::where($type, '=', $id)->first()) {
-                if ($account->active) {
-                    if ($data['points_amount'] <= 0) {
-                        Log::info('Wrong loyalty points amount: ' . $data['points_amount']);
-                        return response()->json(['message' => 'Wrong loyalty points amount'], 400);
-                    }
-                    if ($account->getBalance() < $data['points_amount']) {
-                        Log::info('Insufficient funds: ' . $data['points_amount']);
-                        return response()->json(['message' => 'Insufficient funds'], 400);
-                    }
-
-                    $transaction = LoyaltyPointsTransaction::withdrawLoyaltyPoints($account->id, $data['points_amount'], $data['description']);
-                    Log::info($transaction);
-                    return $transaction;
-                } else {
-                    Log::info('Account is not active: ' . $type . ' ' . $id);
-                    return response()->json(['message' => 'Account is not active'], 400);
-                }
-            } else {
-                Log::info('Account is not found:' . $type . ' ' . $id);
-                return response()->json(['message' => 'Account is not found'], 400);
-            }
-        } else {
-            Log::info('Wrong account parameters');
-            throw new \InvalidArgumentException('Wrong account parameters');
-        }
+    public function withdraw(WithdrawLoyaltyPointsRequest $request, WithdrawHandler $handler): void
+    {
+        $handler->handle(
+            new WithdrawCommand(
+                AccountType::from($request->input('account_type')),
+                (string) $request->input('account_id'),
+                new PointsAmount((float) $request->input('points_amount')),
+                $request->input('description'),
+            )
+        );
     }
 }

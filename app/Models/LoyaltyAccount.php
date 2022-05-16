@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Mail\AccountActivated;
 use App\Mail\AccountDeactivated;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -51,9 +52,25 @@ class LoyaltyAccount extends Model
         'active' => true,
     ];
 
-    public function getBalance(): float
+    protected $casts = [
+        'active' => 'bool',
+        'email_notification' => 'bool',
+        'phone_notification' => 'bool',
+    ];
+
+    public function scopeByPhoneNumber(Builder $builder, string $phoneNumber): Builder
     {
-        return LoyaltyPointsTransaction::where('canceled', '=', 0)->where('account_id', '=', $this->id)->sum('points_amount');
+        return $builder->where('phone', $phoneNumber);
+    }
+
+    public function scopeByCardNumber(Builder $builder, string $cardNumber): Builder
+    {
+        return $builder->where('card', $cardNumber);
+    }
+
+    public function scopeByEmail(Builder $builder, string $email): Builder
+    {
+        return $builder->where('email', $email);
     }
 
     public function notify()
